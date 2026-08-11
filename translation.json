@@ -1,4 +1,5 @@
 {
   "admin": "string",
-  "head": "header"
+  "head": "header",
+  "JOURNAL": "Journals section"
 }

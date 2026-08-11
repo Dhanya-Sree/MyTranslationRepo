@@ -1,4 +1,5 @@
 {
   "admin": "string",
-  "head": "heading1"
+  "head": "heading1",
+  "subtitle": "Sub title"
 }

@@ -16,9 +16,10 @@ jobs:
     env:
       TRANSLATION_FILE: translation.json
       TARGET_BRANCH: master
+      PR_BRANCH: sync/translation-update
 
     steps:
-      - name: Checkout source branch
+      - name: Checkout master-translation
         uses: actions/checkout@v4
         with:
           ref: master-translation
@@ -26,19 +27,21 @@ jobs:
           token: ${{ secrets.SYNC_PAT }}
 
       - name: Save translation file
-        run: |
-          cp $TRANSLATION_FILE /tmp/translation.json
+        run: cp $TRANSLATION_FILE /tmp/translation.json
 
-      - name: Switch to master
+      - name: Switch to master and create PR branch
         run: |
           git fetch origin $TARGET_BRANCH
           git checkout -B $TARGET_BRANCH origin/$TARGET_BRANCH
 
-      - name: Update file
-        run: |
-          cp /tmp/translation.json $TRANSLATION_FILE
+          # Create (or reset) a clean PR branch off master
+          git checkout -B $PR_BRANCH
+
+      - name: Apply translation update
+        run: cp /tmp/translation.json $TRANSLATION_FILE
 
       - name: Commit changes
+        id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -46,15 +49,42 @@ jobs:
           git add $TRANSLATION_FILE
 
           if git diff --cached --quiet; then
-            echo "No changes found"
+            echo "No changes to sync."
+            echo "has_changes=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          git commit -m "Sync translation.json from master-translation"
+          COMMIT_SHA="${{ github.sha }}"
+          git commit -m "chore: sync translation.json from master-translation (${COMMIT_SHA::7})"
+          echo "has_changes=true" >> $GITHUB_OUTPUT
 
-      - name: Push changes
+      - name: Push PR branch
+        if: steps.commit.outputs.has_changes == 'true'
         run: |
           git remote set-url origin \
-          https://x-access-token:${{ secrets.SYNC_PAT }}@github.com/${{ github.repository }}.git
+            https://x-access-token:${{ secrets.SYNC_PAT }}@github.com/${{ github.repository }}.git
 
-          git push origin $TARGET_BRANCH
+          git push origin $PR_BRANCH --force
+
+      - name: Create or update Pull Request
+        if: steps.commit.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.SYNC_PAT }}
+          base: master
+          branch: ${{ env.PR_BRANCH }}
+          title: "chore: sync translation.json from master-translation"
+          body: |
+            ## Translation Sync
+
+            This PR was automatically created by the **Sync Translation** workflow.
+
+            **Source branch:** `master-translation`
+            **Triggered by commit:** ${{ github.sha }}
+
+            ### Changes
+            - Updated `translation.json` to match the latest content on `master-translation`.
+
+            Please review and merge when ready.
+          labels: translation, automated
+          draft: false

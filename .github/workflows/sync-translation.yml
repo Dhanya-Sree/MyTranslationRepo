@@ -1,80 +1,60 @@
-name: Sync Translation from master-translation to master
+name: Sync Translation
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Trigger: any push to the master-translation branch that touches the
-#          English translation file.  Also supports manual dispatch.
-# ──────────────────────────────────────────────────────────────────────────────
 on:
   push:
     branches:
       - master-translation
     paths:
-      - 'translation.json'
-  workflow_dispatch:   # allow manual runs from the Actions tab
+      - translation.json
 
-permissions:
-  contents: write      # needed to push the updated file to master
+  workflow_dispatch:
 
 jobs:
-  sync-and-notify:
+  sync:
     runs-on: ubuntu-latest
+
     env:
       TRANSLATION_FILE: translation.json
       TARGET_BRANCH: master
 
     steps:
-      # ── 1. Check out the master-translation branch (source) ────────────────
-      - name: Checkout master-translation (source)
+      - name: Checkout source branch
         uses: actions/checkout@v4
         with:
           ref: master-translation
-          fetch-depth: 0          # full history so we can diff later
+          fetch-depth: 0
           token: ${{ secrets.SYNC_PAT }}
 
-      # ── 2. Capture the new keys added in this commit ────────────────────────
-      - name: Identify newly added keys
-        id: diff
+      - name: Save translation file
         run: |
-          # Compare the file in master-translation vs master
-          git fetch origin master --depth=1
+          cp $TRANSLATION_FILE /tmp/translation.json
 
-          # Produce a human-readable list of added lines for the Slack message
-          ADDED_LINES=$(git diff origin/master -- "$TRANSLATION_FILE" \
-            | grep '^+' \
-            | grep -v '^+++' \
-            | sed 's/^+//' \
-            | head -40)
-
-          # Store as a multiline output (escape for GitHub Actions)
-          echo "added_lines<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$ADDED_LINES"     >> "$GITHUB_OUTPUT"
-          echo "EOF"              >> "$GITHUB_OUTPUT"
-
-      # ── 3. Copy the updated file into the master branch ────────────────────
-      - name: Push updated translation.json to master
+      - name: Switch to master
         run: |
-          # Stash the updated file
-          cp "$TRANSLATION_FILE" /tmp/translation.json
+          git fetch origin $TARGET_BRANCH
+          git checkout -B $TARGET_BRANCH origin/$TARGET_BRANCH
 
-          # Switch to master
-          git fetch origin master
-          git checkout master
+      - name: Update file
+        run: |
+          cp /tmp/translation.json $TRANSLATION_FILE
 
-          # Overwrite only the translation file
-          cp /tmp/translation.json "$TRANSLATION_FILE"
-
-          # Commit only if there are actual changes
-          git config user.name  "github-actions[bot]"
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git add "$TRANSLATION_FILE"
+          git add $TRANSLATION_FILE
 
           if git diff --cached --quiet; then
-            echo "No changes to commit – translation.json is already up to date."
-            echo "SKIPPED=true" >> "$GITHUB_ENV"
-          else
-            SOURCE_SHA="${{ github.sha }}"
-            git commit -m "chore(i18n): sync translation.json from master-translation [${SOURCE_SHA:0:7}]"
-            git push origin master
-            echo "SKIPPED=false" >> "$GITHUB_ENV"
+            echo "No changes found"
+            exit 0
           fi
+
+          git commit -m "Sync translation.json from master-translation"
+
+      - name: Push changes
+        run: |
+          git remote set-url origin \
+          https://x-access-token:${{ secrets.SYNC_PAT }}@github.com/${{ github.repository }}.git
+
+          git push origin $TARGET_BRANCH

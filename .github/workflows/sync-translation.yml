@@ -11,14 +11,13 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
   sync:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout master (PR target)
+      - name: Checkout master
         uses: actions/checkout@v4
         with:
           ref: master
@@ -30,24 +29,21 @@ jobs:
           git fetch origin master-translation
           git checkout origin/master-translation -- translation.json
 
-      - name: Create or update Pull Request
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.SYNC_PAT }}
-          base: master
-          branch: sync/translation-update
-          commit-message: "chore: sync translation.json from master-translation"
-          title: "chore: sync translation.json from master-translation"
-          body: |
-            ## Translation Sync
+      - name: Commit and push to master
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-            This PR was automatically created by the **Sync Translation** workflow.
+          git add translation.json
 
-            **Source branch:** `master-translation`
-            **Triggered by commit:** ${{ github.sha }}
+          if git diff --cached --quiet; then
+            echo "No changes to sync."
+            exit 0
+          fi
 
-            ### Changes
-            - Updated `translation.json` to match the latest content on `master-translation`.
+          git commit -m "chore: sync translation.json from master-translation"
 
-            Please review and merge when ready.
-          draft: false
+          git remote set-url origin \
+            https://x-access-token:${{ secrets.SYNC_PAT }}@github.com/${{ github.repository }}.git
+
+          git push origin master

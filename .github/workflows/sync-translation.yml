@@ -13,66 +13,26 @@ jobs:
   sync:
     runs-on: ubuntu-latest
 
-    env:
-      TRANSLATION_FILE: translation.json
-      TARGET_BRANCH: master
-      PR_BRANCH: sync/translation-update
-
     steps:
-      - name: Checkout master-translation
+      - name: Checkout master (PR target)
         uses: actions/checkout@v4
         with:
-          ref: master-translation
+          ref: master
           fetch-depth: 0
           token: ${{ secrets.SYNC_PAT }}
 
-      - name: Save translation file
-        run: cp $TRANSLATION_FILE /tmp/translation.json
-
-      - name: Switch to master and create PR branch
+      - name: Fetch translation.json from master-translation
         run: |
-          git fetch origin $TARGET_BRANCH
-          git checkout -B $TARGET_BRANCH origin/$TARGET_BRANCH
-
-          # Create (or reset) a clean PR branch off master
-          git checkout -B $PR_BRANCH
-
-      - name: Apply translation update
-        run: cp /tmp/translation.json $TRANSLATION_FILE
-
-      - name: Commit changes
-        id: commit
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          git add $TRANSLATION_FILE
-
-          if git diff --cached --quiet; then
-            echo "No changes to sync."
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          COMMIT_SHA="${{ github.sha }}"
-          git commit -m "chore: sync translation.json from master-translation (${COMMIT_SHA::7})"
-          echo "has_changes=true" >> $GITHUB_OUTPUT
-
-      - name: Push PR branch
-        if: steps.commit.outputs.has_changes == 'true'
-        run: |
-          git remote set-url origin \
-            https://x-access-token:${{ secrets.SYNC_PAT }}@github.com/${{ github.repository }}.git
-
-          git push origin $PR_BRANCH --force
+          git fetch origin master-translation
+          git checkout origin/master-translation -- translation.json
 
       - name: Create or update Pull Request
-        if: steps.commit.outputs.has_changes == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.SYNC_PAT }}
           base: master
-          branch: ${{ env.PR_BRANCH }}
+          branch: sync/translation-update
+          commit-message: "chore: sync translation.json from master-translation"
           title: "chore: sync translation.json from master-translation"
           body: |
             ## Translation Sync

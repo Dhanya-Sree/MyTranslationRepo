@@ -30,6 +30,7 @@ jobs:
           git checkout origin/master-translation -- translation.json
 
       - name: Commit and push to master
+        id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -38,6 +39,7 @@ jobs:
 
           if git diff --cached --quiet; then
             echo "No changes to sync."
+            echo "has_changes=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -47,3 +49,56 @@ jobs:
             https://x-access-token:${{ secrets.SYNC_PAT }}@github.com/${{ github.repository }}.git
 
           git push origin master
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+
+      - name: Notify Slack
+        if: steps.commit.outputs.has_changes == 'true'
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
+          payload: |
+            {
+              "text": ":white_check_mark: *translation.json* has been synced to `master`",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":white_check_mark: *translation.json synced to `master`*\n\n<@${{ secrets.SLACK_MEMBER_ID }}> — translation changes have been committed to master."
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Committed by:*\n${{ github.actor }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit:*\n`${{ github.sha }}`"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Source branch:*\n`master-translation`"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Target branch:*\n`master`"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": { "type": "plain_text", "text": "View commit" },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

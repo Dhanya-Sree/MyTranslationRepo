@@ -1,5 +1,3 @@
 {
-  "admin": "string",
-  "head": "heading1",
-  "subtitle": "Sub title"
+  "admin": "string"
 }

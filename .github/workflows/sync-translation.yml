@@ -1,0 +1,50 @@
+name: Sync Translation
+
+on:
+  push:
+    branches:
+      - master-translation
+    paths:
+      - translation.json
+
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout master (PR target)
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+          token: ${{ secrets.SYNC_PAT }}
+
+      - name: Fetch translation.json from master-translation
+        run: |
+          git fetch origin master-translation
+          git checkout origin/master-translation -- translation.json
+
+      - name: Create or update Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.SYNC_PAT }}
+          base: master
+          branch: sync/translation-update
+          commit-message: "chore: sync translation.json from master-translation"
+          title: "chore: sync translation.json from master-translation"
+          body: |
+            ## Translation Sync
+
+            This PR was automatically created by the **Sync Translation** workflow.
+
+            **Source branch:** `master-translation`
+            **Triggered by commit:** ${{ github.sha }}
+
+            ### Changes
+            - Updated `translation.json` to match the latest content on `master-translation`.
+
+            Please review and merge when ready.
+          labels: translation, automated
+          draft: false

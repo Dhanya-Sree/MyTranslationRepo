@@ -2,5 +2,6 @@
   "admin": "string",
   "head": "header",
   "POPULATE": "Populate section",
-  "JOURNAL": "journals"
+  "JOURNAL": "journals",
+  "NEW": "New"
 }

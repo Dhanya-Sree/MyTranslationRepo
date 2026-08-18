@@ -1,5 +1,6 @@
 {
   "admin": "string",
   "head": "header",
-  "POPULATE": "Populate section"
+  "POPULATE": "Populate section",
+  "JOURNAL": "journals"
 }

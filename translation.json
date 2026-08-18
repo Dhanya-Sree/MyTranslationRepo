@@ -3,5 +3,6 @@
   "head": "header",
   "POPULATE": "Populate section",
   "JOURNAL": "journals",
-  "REVIEW": "Review"
+  "REVIEW": "Review",
+  "SUMMARY": "Summary"
 }
